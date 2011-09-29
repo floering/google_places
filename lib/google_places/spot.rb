@@ -47,7 +47,7 @@ module GooglePlaces
         :language => language
       )
 
-      self.new(response['result'], api_key) if response == 'OK'
+      self.new(response['result'], api_key) if response['status'] == 'OK'
     end
 
     def initialize(json_result_object, api_key)
