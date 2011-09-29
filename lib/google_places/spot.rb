@@ -78,7 +78,7 @@ module GooglePlaces
         :key => @api_key
       )
       
-      unless response.blank?
+      unless response['result'].blank?
         set_class_vars(response['result'])
         @refreshed = true
       end
