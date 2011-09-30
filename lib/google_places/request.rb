@@ -26,12 +26,15 @@ module GooglePlaces
       @response = self.class.get(url, :query => options)
 
       if ignore_failures.include?(@response.parsed_response['status'])
-        Timeout::timeout(timeout) {
-          begin
-            @response = self.class.get(url, :query => options)
-            sleep(delay)
-          end while ignore_failures.include?(@response.parsed_response['status'])
-        }
+        begin
+          Timeout::timeout(timeout) {
+            begin
+              sleep(delay)
+              @response = self.class.get(url, :query => options)
+            end while ignore_failures.include?(@response.parsed_response['status'])
+          }
+        rescue Timeout::Error
+        end
       end
     end
 
