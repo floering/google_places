@@ -2,26 +2,31 @@ require 'open-uri'
 
 module GooglePlaces
   class Spot
-    attr_accessor :reference
+    attr_accessor :reference, :lat, :lng, :vicinity, :name, :icon, :types, :id, :formatted_phone_number, :formatted_address, :address_components, :rating, :url
 
     def self.list(lat, lng, api_key, options = {})
-      radius = options.delete(:radius) || 200
-      sensor = options.delete(:sensor) || false
-      types  = options.delete(:types)
-      name  = options.delete(:name)
-      language  = options.delete(:language)
-      location = Location.new(lat, lng)
-      exclude = options.delete(:exclude) || []
-
+      radius          = options.delete(:radius)          || 200
+      sensor          = options.delete(:sensor)          || false
+      types           = options.delete(:types)
+      name            = options.delete(:name)
+      language        = options.delete(:language)
+      location        = Location.new(lat, lng)
+      exclude         = options.delete(:exclude)         || []
+      ignore_failures = options.delete(:ignore_failures) || []
+      timeout         = options.delete(:timeout)         || 20.second
+      delay           = options.delete(:delay)           || 5.second
       exclude = [exclude] unless exclude.is_a?(Array)
 
       options = {
-        :location => location.format,
-        :radius => radius,
-        :sensor => sensor,
-        :key => api_key,
-        :name => name,
-        :language => language
+        :location        => location.format,
+        :radius          => radius,
+        :sensor          => sensor,
+        :key             => api_key,
+        :name            => name,
+        :language        => language,
+        :ignore_failures => ignore_failures,
+        :timeout         => timeout,
+        :delay           => delay
       }
 
       # Accept Types as a string or array
@@ -32,27 +37,34 @@ module GooglePlaces
 
       response = Request.spots(options)
       response['results'].map do |result|
-        self.new(result, api_key) if (result['types'] & exclude) == []
+        self.new(result, api_key, ignore_failures, timeout, delay) if (result['types'] & exclude) == []
       end.compact
     end
 
     def self.find(reference, api_key, options = {})
       sensor = options.delete(:sensor) || false
       language  = options.delete(:language)
+      ignore_over_query_limit  = options.delete(:ignore_over_query_limit) || false
 
       response = Request.spot(
-        :reference => reference,
-        :sensor => sensor,
-        :key => api_key,
-        :language => language
+        :reference       => reference,
+        :sensor          => sensor,
+        :key             => api_key,
+        :language        => language,
+        :ignore_failures => ignore_failures,
+        :timeout         => timeout,
+        :delay           => delay
       )
 
-      self.new(response['result'], api_key) if response['status'] == 'OK'
+      self.new(response['result'], api_key, ignore_failures, timeout, delay) if response['status'] == 'OK'
     end
 
-    def initialize(json_result_object, api_key)
+    def initialize(json_result_object, api_key, ignore_failures = [], timeout = 30.second, delay = 5.second)
       set_class_vars(json_result_object)
-      @api_key                = api_key
+      @api_key         = api_key
+      @ignore_failures = ignore_failures
+      @timeout         = timeout
+      @delay           = delay
     end
     
     def set_class_vars(json_result_object)
@@ -73,9 +85,12 @@ module GooglePlaces
     
     def refresh
       response = Request.spot(
-        :reference => @reference,
-        :sensor => false,
-        :key => @api_key
+        :reference       => @reference,
+        :sensor          => false,
+        :key             => @api_key,
+        :ignore_failures => @ignore_failures,
+        :timeout         => @timeout,
+        :delay           => @delay
       )
       
       if response['status'] == 'OK'

@@ -19,12 +19,33 @@ module GooglePlaces
     end
 
     def initialize(url, options)
+      ignore_failures = options.delete(:ignore_failures) || []
+      timeout         = options.delete(:timeout)         || 20.second
+      delay           = options.delete(:delay)           || 5.second
+
       @response = self.class.get(url, :query => options)
+
+      if ignore_failures.include?(@response.parsed_response['status'])
+        Timeout::timeout(timeout) {
+          begin
+            @response = self.class.get(url, :query => options)
+            sleep(delay)
+          end while ignore_failures.include?(@response.parsed_response['status'])
+        }
+      end
     end
 
     def parsed_response
-      @response.parsed_response
+      case @response.parsed_response['status']
+      when 'OK', 'ZERO_RESULTS'
+        @response.parsed_response
+      when 'OVER_QUERY_LIMIT'
+        raise OverQueryLimitError.new(@response)
+      when 'REQUEST_DENIED'
+        raise RequestDeniedError.new(@response)
+      when 'INVALID_REQUEST'
+        raise InvalidRequestError.new(@response)
+      end
     end
-
   end
 end
