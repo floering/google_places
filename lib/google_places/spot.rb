@@ -13,7 +13,6 @@ module GooglePlaces
       location      = Location.new(lat, lng)
       exclude       = options.delete(:exclude)       || []
       retry_options = options.delete(:retry_options) || {}
-      exclude       = options.delete(:exclude)       || []
 
       exclude = [exclude] unless exclude.is_a?(Array)
 
