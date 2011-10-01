@@ -14,7 +14,8 @@ module GooglePlaces
       exclude       = options.delete(:exclude)       || []
       retry_options = options.delete(:retry_options) || {}
       exclude       = options.delete(:exclude)       || []
-      exclude       = [exclude] unless exclude.is_a?(Array)
+
+      exclude = [exclude] unless exclude.is_a?(Array)
 
       options = {
         :location      => location.format,
