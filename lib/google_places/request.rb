@@ -22,8 +22,8 @@ module GooglePlaces
       retry_options = options.delete(:retry_options) || {}
 
       retry_options[:status]  ||= []
-      retry_options[:timeout] ||= 20.second
-      retry_options[:delay]   ||= 5.second
+      retry_options[:timeout] ||= 20
+      retry_options[:delay]   ||= 5
       retry_options[:max]     ||= 3
 
       retry_options[:status] = [retry_options[:status]] unless retry_options[:status].is_a?(Array)
