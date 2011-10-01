@@ -30,15 +30,17 @@ module GooglePlaces
 
       @response = self.class.get(url, :query => options)
 
-      begin
-        Timeout::timeout(timeout) {
-          while retry_options[:max] > 0 && retry_options[:status].include?(@response.parsed_response['status'])
-            sleep(retry_options[:delay])
-            @response = self.class.get(url, :query => options)
-            retry_options[:max] -= 1
-          end
-        }
-      rescue Timeout::Error
+      if retry_options[:status].include?(@response.parsed_response['status'])
+        begin
+          Timeout::timeout(retry_options[:timeout]) {
+            while retry_options[:max] > 0 && retry_options[:status].include?(@response.parsed_response['status'])
+              sleep(retry_options[:delay])
+              @response = self.class.get(url, :query => options)
+              retry_options[:max] -= 1
+            end
+          }
+        rescue Timeout::Error
+        end
       end
     end
 
@@ -54,5 +56,6 @@ module GooglePlaces
         raise InvalidRequestError.new(@response)
       end
     end
+
   end
 end
