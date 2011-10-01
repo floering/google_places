@@ -19,19 +19,25 @@ module GooglePlaces
     end
 
     def initialize(url, options)
-      ignore_failures = options.delete(:ignore_failures) || []
-      timeout         = options.delete(:timeout)         || 20.second
-      delay           = options.delete(:delay)           || 5.second
+      retry_options = options.delete(:retry_options) || {}
+
+      retry_options[:status]  ||= []
+      retry_options[:timeout] ||= 20.second
+      retry_options[:delay]   ||= 5.second
+      retry_options[:max]     ||= 3
+
+      retry_options[:status] = [retry_options[:status]] unless retry_options[:status].is_a?(Array)
 
       @response = self.class.get(url, :query => options)
 
-      if ignore_failures.include?(@response.parsed_response['status'])
+      if retry_options[:status].include?(@response.parsed_response['status'])
         begin
           Timeout::timeout(timeout) {
-            begin
+            while retry_options[:max] > 0 && retry_options[:status].include?(@response.parsed_response['status'])
               sleep(delay)
               @response = self.class.get(url, :query => options)
-            end while ignore_failures.include?(@response.parsed_response['status'])
+              retry_options[:max] -= 1
+            end
           }
         rescue Timeout::Error
         end

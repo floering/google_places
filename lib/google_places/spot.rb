@@ -5,28 +5,25 @@ module GooglePlaces
     attr_accessor :reference, :lat, :lng, :vicinity, :name, :icon, :types, :id, :formatted_phone_number, :formatted_address, :address_components, :rating, :url
 
     def self.list(lat, lng, api_key, options = {})
-      radius          = options.delete(:radius)          || 200
-      sensor          = options.delete(:sensor)          || false
-      types           = options.delete(:types)
-      name            = options.delete(:name)
-      language        = options.delete(:language)
-      location        = Location.new(lat, lng)
-      exclude         = options.delete(:exclude)         || []
-      ignore_failures = options.delete(:ignore_failures) || []
-      timeout         = options.delete(:timeout)         || 20.second
-      delay           = options.delete(:delay)           || 5.second
-      exclude = [exclude] unless exclude.is_a?(Array)
+      radius        = options.delete(:radius)        || 200
+      sensor        = options.delete(:sensor)        || false
+      types         = options.delete(:types)
+      name          = options.delete(:name)
+      language      = options.delete(:language)
+      location      = Location.new(lat, lng)
+      exclude       = options.delete(:exclude)       || []
+      retry_options = options.delete(:retry_options) || {}
+      exclude       = options.delete(:exclude)       || []
+      exclude       = [exclude] unless exclude.is_a?(Array)
 
       options = {
-        :location        => location.format,
-        :radius          => radius,
-        :sensor          => sensor,
-        :key             => api_key,
-        :name            => name,
-        :language        => language,
-        :ignore_failures => ignore_failures,
-        :timeout         => timeout,
-        :delay           => delay
+        :location      => location.format,
+        :radius        => radius,
+        :sensor        => sensor,
+        :key           => api_key,
+        :name          => name,
+        :language      => language,
+        :retry_options => retry_options
       }
 
       # Accept Types as a string or array
@@ -37,34 +34,30 @@ module GooglePlaces
 
       response = Request.spots(options)
       response['results'].map do |result|
-        self.new(result, api_key, ignore_failures, timeout, delay) if (result['types'] & exclude) == []
+        self.new(result, api_key, retry_options) if (result['types'] & exclude) == []
       end.compact
     end
 
     def self.find(reference, api_key, options = {})
-      sensor = options.delete(:sensor) || false
-      language  = options.delete(:language)
-      ignore_over_query_limit  = options.delete(:ignore_over_query_limit) || false
+      sensor        = options.delete(:sensor)       || false
+      language      = options.delete(:language)
+      retry_options = options.delete(:retry_options) || {}
 
       response = Request.spot(
-        :reference       => reference,
-        :sensor          => sensor,
-        :key             => api_key,
-        :language        => language,
-        :ignore_failures => ignore_failures,
-        :timeout         => timeout,
-        :delay           => delay
+        :reference     => reference,
+        :sensor        => sensor,
+        :key           => api_key,
+        :language      => language,
+        :retry_options => retry_options
       )
 
-      self.new(response['result'], api_key, ignore_failures, timeout, delay) if response['status'] == 'OK'
+      self.new(response['result'], api_key, retry_options) if response['status'] == 'OK'
     end
 
-    def initialize(json_result_object, api_key, ignore_failures = [], timeout = 30.second, delay = 5.second)
+    def initialize(json_result_object, api_key, retry_options = {})
       set_class_vars(json_result_object)
-      @api_key         = api_key
-      @ignore_failures = ignore_failures
-      @timeout         = timeout
-      @delay           = delay
+      @api_key       = api_key
+      @retry_options = retry_options
     end
     
     def set_class_vars(json_result_object)
@@ -85,12 +78,10 @@ module GooglePlaces
     
     def refresh
       response = Request.spot(
-        :reference       => @reference,
-        :sensor          => false,
-        :key             => @api_key,
-        :ignore_failures => @ignore_failures,
-        :timeout         => @timeout,
-        :delay           => @delay
+        :reference     => @reference,
+        :sensor        => false,
+        :key           => @api_key,
+        :retry_options => @retry_options
       )
       
       if response['status'] == 'OK'
