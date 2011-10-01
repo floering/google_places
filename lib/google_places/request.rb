@@ -30,17 +30,15 @@ module GooglePlaces
 
       @response = self.class.get(url, :query => options)
 
-      if retry_options[:status].include?(@response.parsed_response['status'])
-        begin
-          Timeout::timeout(timeout) {
-            while retry_options[:max] > 0 && retry_options[:status].include?(@response.parsed_response['status'])
-              sleep(delay)
-              @response = self.class.get(url, :query => options)
-              retry_options[:max] -= 1
-            end
-          }
-        rescue Timeout::Error
-        end
+      begin
+        Timeout::timeout(timeout) {
+          while retry_options[:max] > 0 && retry_options[:status].include?(@response.parsed_response['status'])
+            sleep(retry_options[:delay])
+            @response = self.class.get(url, :query => options)
+            retry_options[:max] -= 1
+          end
+        }
+      rescue Timeout::Error
       end
     end
 
