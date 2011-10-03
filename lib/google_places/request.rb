@@ -21,26 +21,35 @@ module GooglePlaces
     def initialize(url, options)
       retry_options = options.delete(:retry_options) || {}
 
-      retry_options[:status]  ||= []
-      retry_options[:timeout] ||= 20
-      retry_options[:delay]   ||= 5
-      retry_options[:max]     ||= 3
+      retry_options[:status] ||= []
+      retry_options[:max]    ||= 0
+      retry_options[:delay]  ||= 5
 
       retry_options[:status] = [retry_options[:status]] unless retry_options[:status].is_a?(Array)
 
       @response = self.class.get(url, :query => options)
 
-      if retry_options[:status].include?(@response.parsed_response['status'])
+      return unless retry_options[:max] > 0 && retry_options[:status].include?(@response.parsed_response['status'])
+
+      retry_request = proc do
+        for i in (1..retry_options[:max])
+          sleep(retry_options[:delay])
+
+          @response = self.class.get(url, :query => options)
+
+          break unless retry_options[:status].include?(@response.parsed_response['status'])
+        end
+      end
+
+      if retry_options[:timeout]
         begin
-          Timeout::timeout(retry_options[:timeout]) {
-            while retry_options[:max] > 0 && retry_options[:status].include?(@response.parsed_response['status'])
-              sleep(retry_options[:delay])
-              @response = self.class.get(url, :query => options)
-              retry_options[:max] -= 1
-            end
-          }
+          Timeout::timeout(retry_options[:timeout]) do
+            retry_request.call
+          end
         rescue Timeout::Error
         end
+      else
+        retry_request.call
       end
     end
 
