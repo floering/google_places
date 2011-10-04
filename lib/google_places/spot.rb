@@ -2,7 +2,7 @@ require 'open-uri'
 
 module GooglePlaces
   class Spot
-    attr_accessor :reference, :lat, :lng, :vicinity, :name, :icon, :types, :id, :formatted_phone_number, :formatted_address, :address_components, :rating, :url
+    attr_accessor :reference
 
     def self.list(lat, lng, api_key, options = {})
       radius        = options.delete(:radius)        || 200
@@ -39,7 +39,7 @@ module GooglePlaces
     end
 
     def self.find(reference, api_key, options = {})
-      sensor        = options.delete(:sensor)       || false
+      sensor        = options.delete(:sensor)        || false
       language      = options.delete(:language)
       retry_options = options.delete(:retry_options) || {}
 
@@ -51,12 +51,14 @@ module GooglePlaces
         :retry_options => retry_options
       )
 
-      self.new(response['result'], api_key, retry_options) if response['status'] == 'OK'
+      self.new(response['result'], sensor, api_key, language, retry_options) if response['status'] == 'OK'
     end
 
-    def initialize(json_result_object, api_key, retry_options = {})
+    def initialize(json_result_object, sensor, api_key, language, retry_options = {})
       set_class_vars(json_result_object)
+      @sensor        = sensor
       @api_key       = api_key
+      @language      = language
       @retry_options = retry_options
     end
     
@@ -79,8 +81,9 @@ module GooglePlaces
     def refresh
       response = Request.spot(
         :reference     => @reference,
-        :sensor        => false,
+        :sensor        => @sensor,
         :key           => @api_key,
+        :language      => @language,
         :retry_options => @retry_options
       )
       
