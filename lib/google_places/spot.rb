@@ -5,23 +5,25 @@ module GooglePlaces
     attr_accessor :reference
 
     def self.list(lat, lng, api_key, options = {})
-      radius = options.delete(:radius) || 200
-      sensor = options.delete(:sensor) || false
-      types  = options.delete(:types)
-      name  = options.delete(:name)
-      language  = options.delete(:language)
-      location = Location.new(lat, lng)
-      exclude = options.delete(:exclude) || []
+      radius        = options.delete(:radius)        || 200
+      sensor        = options.delete(:sensor)        || false
+      types         = options.delete(:types)
+      name          = options.delete(:name)
+      language      = options.delete(:language)
+      location      = Location.new(lat, lng)
+      exclude       = options.delete(:exclude)       || []
+      retry_options = options.delete(:retry_options) || {}
 
       exclude = [exclude] unless exclude.is_a?(Array)
 
       options = {
-        :location => location.format,
-        :radius => radius,
-        :sensor => sensor,
-        :key => api_key,
-        :name => name,
-        :language => language
+        :location      => location.format,
+        :radius        => radius,
+        :sensor        => sensor,
+        :key           => api_key,
+        :name          => name,
+        :language      => language,
+        :retry_options => retry_options
       }
 
       # Accept Types as a string or array
@@ -32,27 +34,32 @@ module GooglePlaces
 
       response = Request.spots(options)
       response['results'].map do |result|
-        self.new(result, api_key) if (result['types'] & exclude) == []
+        self.new(result, sensor, api_key, language, retry_options) if (result['types'] & exclude) == []
       end.compact
     end
 
     def self.find(reference, api_key, options = {})
-      sensor = options.delete(:sensor) || false
-      language  = options.delete(:language)
+      sensor        = options.delete(:sensor)        || false
+      language      = options.delete(:language)
+      retry_options = options.delete(:retry_options) || {}
 
       response = Request.spot(
-        :reference => reference,
-        :sensor => sensor,
-        :key => api_key,
-        :language => language
+        :reference     => reference,
+        :sensor        => sensor,
+        :key           => api_key,
+        :language      => language,
+        :retry_options => retry_options
       )
 
-      self.new(response['result'], api_key)
+      self.new(response['result'], sensor, api_key, language, retry_options) if response['status'] == 'OK'
     end
 
-    def initialize(json_result_object, api_key)
+    def initialize(json_result_object, sensor, api_key, language, retry_options = {})
       set_class_vars(json_result_object)
-      @api_key                = api_key
+      @sensor        = sensor
+      @api_key       = api_key
+      @language      = language
+      @retry_options = retry_options
     end
     
     def set_class_vars(json_result_object)
@@ -73,13 +80,17 @@ module GooglePlaces
     
     def refresh
       response = Request.spot(
-        :reference => @reference,
-        :sensor => false,
-        :key => @api_key
+        :reference     => @reference,
+        :sensor        => @sensor,
+        :key           => @api_key,
+        :language      => @language,
+        :retry_options => @retry_options
       )
       
-      set_class_vars(response['result'])
-      @refreshed = true
+      if response['status'] == 'OK'
+        set_class_vars(response['result'])
+        @refreshed = true
+      end
     end
     
     def closed?
