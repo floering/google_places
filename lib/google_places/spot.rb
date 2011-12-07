@@ -34,7 +34,7 @@ module GooglePlaces
 
       response = Request.spots(options)
       response['results'].map do |result|
-        self.new(result, api_key, retry_options) if (result['types'] & exclude) == []
+        self.new(result, sensor, api_key, language, retry_options) if (result['types'] & exclude) == []
       end.compact
     end
 
